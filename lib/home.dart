@@ -1,11 +1,13 @@
 import 'dart:io';
-import 'package:audioplayers/audioplayers.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_audio/recorder/cloud_record_list_view.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
+import 'package:uuid/uuid.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,14 +22,12 @@ class _HomeScreenState extends State<HomeScreen> {
   bool isRecording = false;
   String audioPath = '';
   bool _isUploading = false;
-  List<Reference> references = [];
   bool isPLaying = false;
 
   @override
   initState() {
     audioPlayer = AudioPlayer();
     audioRecord = Record();
-    _onUploadComplete();
     super.initState();
   }
 
@@ -67,7 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (kDebugMode) {
           print("Audio Path $audioPath");
         }
-        _onFileUploadButtonPressed(context);
+        _onFileUploadButtonPressed(context, audioPath);
       });
     } catch (e) {
       if (kDebugMode) {
@@ -76,59 +76,96 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Play Recording
-  Future<void> playRecording() async {
-    try {
-      Source urlSource = UrlSource(audioPath);
-      if (kDebugMode) {
-        print("Url Maker $urlSource");
-      }
-      await audioPlayer.play(urlSource);
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error Stopping  Record : $e');
-      }
-    }
-  }
+  // bool _isUploading = false;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-// Upload Audio Firebase
-  Future<void> _onFileUploadButtonPressed(context) async {
+  // Upload Audio Firebase
+  Future<void> _onFileUploadButtonPressed(context, String audioPath) async {
     FirebaseStorage firebaseStorage = FirebaseStorage.instance;
+    String generateRandomId() {
+      // Using the UUID package to generate a random ID
+      var uuid = const Uuid();
+      return uuid.v4(); // Generating a version 4 (random) UUID
+    }
+
     setState(() {
       _isUploading = true;
     });
     try {
-      await firebaseStorage
+      TaskSnapshot uploadTask = await firebaseStorage
           .ref('upload-voice-firebase')
           .child(
               audioPath.substring(audioPath.lastIndexOf('/'), audioPath.length))
           .putFile(File(audioPath));
+
+      String downloadURL = await uploadTask.ref.getDownloadURL();
+
+      String randomId = generateRandomId();
+
+      await _firestore.collection('audioFiles').doc(randomId).set({
+        'downloadURL': downloadURL,
+        'audio_id': randomId,
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('File uploaded successfully'),
+        ),
+      );
     } catch (error) {
       if (kDebugMode) {
-        print('Error occured while uplaoding to Firebase ${error.toString()}');
+        print('Error occurred while uploading to Firebase ${error.toString()}');
       }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Error occured while uplaoding'),
+          content: Text('Error occurred while uploading'),
         ),
       );
     } finally {
       setState(() {
         _isUploading = false;
       });
-      _onUploadComplete();
     }
   }
 
-  // Get Audio List From Firebase
-  Future<void> _onUploadComplete() async {
-    FirebaseStorage firebaseStorage = FirebaseStorage.instance;
-    ListResult listResult =
-        await firebaseStorage.ref().child('upload-voice-firebase').list();
-    setState(() {
-      references = listResult.items;
-    });
-  }
+// // Upload Audio Firebase
+//   Future<void> _onFileUploadButtonPressed(context) async {
+//     FirebaseStorage firebaseStorage = FirebaseStorage.instance;
+//     setState(() {
+//       _isUploading = true;
+//     });
+//     try {
+//       await firebaseStorage
+//           .ref('upload-voice-firebase')
+//           .child(
+//               audioPath.substring(audioPath.lastIndexOf('/'), audioPath.length))
+//           .putFile(File(audioPath));
+//     } catch (error) {
+//       if (kDebugMode) {
+//         print('Error occured while uplaoding to Firebase ${error.toString()}');
+//       }
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         const SnackBar(
+//           content: Text('Error occured while uplaoding'),
+//         ),
+//       );
+//     } finally {
+//       setState(() {
+//         _isUploading = false;
+//       });
+//       _onUploadComplete();
+//     }
+//   }
+//
+//   // Get Audio List From Firebase
+//   Future<void> _onUploadComplete() async {
+//     FirebaseStorage firebaseStorage = FirebaseStorage.instance;
+//     ListResult listResult =
+//         await firebaseStorage.ref().child('upload-voice-firebase').list();
+//     setState(() {
+//       references = listResult.items;
+//     });
+//   }
 
   @override
   Widget build(BuildContext context) {
@@ -183,15 +220,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                   ),
-                  Flexible(
+                  const Flexible(
                     flex: 4,
-                    child: references.isEmpty
-                        ? const Center(
-                            child: Text('No File uploaded yet'),
-                          )
-                        : CloudRecordListView(
-                            references: references,
-                          ),
+                    child: CloudRecordListView(),
                   ),
                 ],
               ),
