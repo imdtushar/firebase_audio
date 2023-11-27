@@ -2,6 +2,8 @@ import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:logger/logger.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../page_manager.dart';
 import 'audio_file.dart';
 
@@ -15,7 +17,9 @@ class CloudRecordListView extends StatefulWidget {
 }
 
 class _CloudRecordListViewState extends State<CloudRecordListView> {
+  var logger = Logger();
   late AudioPlayer audioPlayer;
+  late SharedPreferences prefs;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   int? selectedIndex = -1;
   String url = '';
@@ -30,7 +34,7 @@ class _CloudRecordListViewState extends State<CloudRecordListView> {
     ),
   );
 
-  Future<void> getAudioData() async {
+  Future<void> getAudioDatass() async {
     try {
       QuerySnapshot querySnapshot =
           await _firestore.collection('audioFiles').get();
@@ -41,7 +45,7 @@ class _CloudRecordListViewState extends State<CloudRecordListView> {
         }).toList();
       });
     } catch (error) {
-      print('Error retrieving data: $error');
+      print('Error retrieving Datass: $error');
     }
   }
 
@@ -49,7 +53,11 @@ class _CloudRecordListViewState extends State<CloudRecordListView> {
   void initState() {
     super.initState();
     audioPlayer = AudioPlayer();
-    getAudioData();
+    getAudioDatass();
+
+    SharedPreferences.getInstance().then((sharedPrefs) {
+      prefs = sharedPrefs;
+    });
 
     audioPlayer.playerStateStream.listen((playerState) {
       final isPlayying = playerState.playing;
@@ -64,7 +72,6 @@ class _CloudRecordListViewState extends State<CloudRecordListView> {
         buttonNotifier.value = ButtonState.playing;
       } else {
         audioPlayer.seek(Duration.zero);
-        // pause();
       }
     });
 
@@ -100,7 +107,6 @@ class _CloudRecordListViewState extends State<CloudRecordListView> {
     audioPlayer.seek(position);
   }
 
-
   @override
   Widget build(BuildContext context) {
     if (audioList.isEmpty) {
@@ -112,7 +118,7 @@ class _CloudRecordListViewState extends State<CloudRecordListView> {
         mainAxisAlignment: MainAxisAlignment.start,
         children: [
           RefreshIndicator(
-            onRefresh: () => getAudioData(),
+            onRefresh: () => getAudioDatass(),
             child: ListView.separated(
               separatorBuilder: (context, index) {
                 return const SizedBox(
@@ -183,7 +189,7 @@ class _CloudRecordListViewState extends State<CloudRecordListView> {
             );
     } else {
       return IconButton(
-        onPressed: () => iconButton(index, myModel),
+        onPressed: () => retrieveRecentPlayInfo(index, myModel),
         icon: const Center(child: Icon(Icons.play_arrow)),
         iconSize: 30,
       );
@@ -194,24 +200,52 @@ class _CloudRecordListViewState extends State<CloudRecordListView> {
     selectedIndex = index;
 
     if (myModel.isPlaying == true) {
-      audioPlayer.stop();
-      myModel.isPlaying = false;
+      pause(myModel);
     } else {
+      retrieveRecentPlayInfo(index, myModel);
+    }
+  }
+
+
+
+  Future<void> storeRecentPlayInfo(AudioFile myModel, Duration position) async {
+    await prefs.setString('recentId', myModel.audioId ?? '');
+    await prefs.setInt('recentDuration', position.inMilliseconds);
+  }
+
+  Future<void> retrieveRecentPlayInfo(int index, AudioFile myModel) async {
+    final recentId = prefs.getString('recentId') ?? '';
+    final recentDuration = prefs.getInt('recentDuration') ?? 0;
+    selectedIndex = index;
+
+    logger.d('Datass 1: $recentId');
+    logger.d('Datass 2: $recentDuration');
+
+
+    if (recentId == myModel.audioId) {
+      logger.d('Datass 3:');
+      final storedDuration = Duration(milliseconds: recentDuration);
+      final storedUrl = myModel.downloadURL ?? '';
+      await audioPlayer.setUrl(storedUrl);
+      audioPlayer.seek(storedDuration);
+      audioPlayer.play();
+      myModel.isPlaying = true;
+    } else {
+      logger.d('Datass 4:');
       url = myModel.downloadURL ?? "";
-      audioPlayer.setUrl(url);
+      await audioPlayer.setUrl(url);
       audioPlayer.play();
       myModel.isPlaying = true;
     }
     setState(() {});
   }
 
-  iconButton(int index, AudioFile myModel) async {
-    selectedIndex = index;
-
-    url = myModel.downloadURL ?? "";
-    await audioPlayer.setUrl(url);
-    audioPlayer.play();
-    myModel.isPlaying = true;
+  pause(AudioFile myModel) async {
+    logger.d('Datass 5:');
+    final position = audioPlayer.position;
+    storeRecentPlayInfo(myModel, position);
+    audioPlayer.stop();
+    myModel.isPlaying = false;
     setState(() {});
   }
 }

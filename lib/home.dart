@@ -76,16 +76,14 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // bool _isUploading = false;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Upload Audio Firebase
   Future<void> _onFileUploadButtonPressed(context, String audioPath) async {
     FirebaseStorage firebaseStorage = FirebaseStorage.instance;
     String generateRandomId() {
-      // Using the UUID package to generate a random ID
       var uuid = const Uuid();
-      return uuid.v4(); // Generating a version 4 (random) UUID
+      return uuid.v4();
     }
 
     setState(() {
@@ -128,44 +126,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-// // Upload Audio Firebase
-//   Future<void> _onFileUploadButtonPressed(context) async {
-//     FirebaseStorage firebaseStorage = FirebaseStorage.instance;
-//     setState(() {
-//       _isUploading = true;
-//     });
-//     try {
-//       await firebaseStorage
-//           .ref('upload-voice-firebase')
-//           .child(
-//               audioPath.substring(audioPath.lastIndexOf('/'), audioPath.length))
-//           .putFile(File(audioPath));
-//     } catch (error) {
-//       if (kDebugMode) {
-//         print('Error occured while uplaoding to Firebase ${error.toString()}');
-//       }
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         const SnackBar(
-//           content: Text('Error occured while uplaoding'),
-//         ),
-//       );
-//     } finally {
-//       setState(() {
-//         _isUploading = false;
-//       });
-//       _onUploadComplete();
-//     }
-//   }
-//
-//   // Get Audio List From Firebase
-//   Future<void> _onUploadComplete() async {
-//     FirebaseStorage firebaseStorage = FirebaseStorage.instance;
-//     ListResult listResult =
-//         await firebaseStorage.ref().child('upload-voice-firebase').list();
-//     setState(() {
-//       references = listResult.items;
-//     });
-//   }
 
   @override
   Widget build(BuildContext context) {
@@ -209,14 +169,6 @@ class _HomeScreenState extends State<HomeScreen> {
                               ? const Text("Stop Recording")
                               : const Text("Start Recording"),
                         ),
-                        // const SizedBox(
-                        //   height: 25,
-                        // ),
-                        // if (!isRecording && audioPath.isNotEmpty)
-                        //   ElevatedButton(
-                        //     onPressed: playRecording,
-                        //     child: const Text('Pay Recording'),
-                        //   ),
                       ],
                     ),
                   ),
